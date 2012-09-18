@@ -5,13 +5,16 @@ from django.db.models import get_model
 
 SETTINGS = getattr(settings, 'ACTSTREAM_SETTINGS', {})
 
+def get_user_model():
+    return getattr(settings, 'AUTH_USER_MODEL', 'auth.User')
+
 def get_models():
     """
     Returns a lookup of 'app_label.model': <model class> from ACTSTREAM_SETTINGS['MODELS']
     Only call this right before you need to inspect the models
     """
     models = {}
-    for model in SETTINGS.get('MODELS', ('auth.User',)):
+    for model in SETTINGS.get('MODELS', (get_user_model(),)):
         models[model.lower()] = get_model(*model.split('.'))
     return models
 
