@@ -81,6 +81,11 @@ def is_following(user, obj):
         content_type=ContentType.objects.get_for_model(obj)).count())
 
 
+DEFAULT_CHECK_DUPLICATE_FIELDS = ['actor_content_type', 'actor_object_id',
+    'verb', 'target_object_id', 'target_content_type',
+    'action_object_object_id', 'action_object_content_type']
+
+
 def action_handler(verb, **kwargs):
     """
     Handler function to create Action instance upon action signal call.
@@ -90,22 +95,41 @@ def action_handler(verb, **kwargs):
     kwargs.pop('signal', None)
     actor = kwargs.pop('sender')
     check_actionable_model(actor)
-    newaction = Action(
-        actor_content_type=ContentType.objects.get_for_model(actor),
-        actor_object_id=actor.pk,
-        verb=unicode(verb),
-        public=bool(kwargs.pop('public', True)),
-        description=kwargs.pop('description', None),
-        timestamp=kwargs.pop('timestamp', now())
-    )
+
+    instance_kwargs = {
+        'actor_content_type': ContentType.objects.get_for_model(actor),
+        'actor_object_id': actor.pk,
+        'verb': unicode(verb),
+        'description': kwargs.pop('description', None),
+        'public': bool(kwargs.pop('public', True)),
+    }
 
     for opt in ('target', 'action_object'):
         obj = kwargs.pop(opt, None)
         if not obj is None:
             check_actionable_model(obj)
-            setattr(newaction, '%s_object_id' % opt, obj.pk)
-            setattr(newaction, '%s_content_type' % opt,
-                    ContentType.objects.get_for_model(obj))
+            instance_kwargs['%s_object_id' % opt] = obj.pk
+            instance_kwargs['%s_content_type' % opt] = \
+                ContentType.objects.get_for_model(obj)
+
+    prevent_duplicates = kwargs.pop('prevent_duplicates', False)
+
+    # Make sure this runs after opts and prevent_duplicates are removed
     if settings.USE_JSONFIELD and len(kwargs):
-        newaction.data = kwargs
+        instance_kwargs['data'] = kwargs
+
+    if prevent_duplicates:
+        try:
+            fields = iter(prevent_duplicates)
+        except TypeError:
+            fields = DEFAULT_CHECK_DUPLICATE_FIELDS
+        unique_kwargs = {field: instance_kwargs[field] for field in fields}
+        if Action.objects.filter(**unique_kwargs).exists():
+            return
+
+    newaction = Action(
+        timestamp=kwargs.pop('timestamp', now()),
+        **instance_kwargs
+    )
+
     newaction.save()
