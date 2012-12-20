@@ -113,17 +113,20 @@ def action_handler(verb, **kwargs):
                 ContentType.objects.get_for_model(obj)
 
     prevent_duplicates = kwargs.pop('prevent_duplicates', False)
+    prevent_duplicates_since = kwargs.pop('prevent_duplicates_since', None)
 
     # Make sure this runs after opts and prevent_duplicates are removed
     if settings.USE_JSONFIELD and len(kwargs):
         instance_kwargs['data'] = kwargs
 
-    if prevent_duplicates:
+    if prevent_duplicates or prevent_duplicates_since:
         try:
             fields = iter(prevent_duplicates)
         except TypeError:
             fields = DEFAULT_CHECK_DUPLICATE_FIELDS
         unique_kwargs = {field: instance_kwargs[field] for field in fields}
+        if prevent_duplicates_since:
+            unique_kwargs['timestamp__gte'] = prevent_duplicates_since
         if Action.objects.filter(**unique_kwargs).exists():
             return
 
