@@ -124,7 +124,7 @@ def action_handler(verb, **kwargs):
             fields = iter(prevent_duplicates)
         except TypeError:
             fields = DEFAULT_CHECK_DUPLICATE_FIELDS
-        unique_kwargs = {field: instance_kwargs[field] for field in fields}
+        unique_kwargs = {field: instance_kwargs[field] for field in fields if field in instance_kwargs}
         if prevent_duplicates_since:
             unique_kwargs['timestamp__gte'] = prevent_duplicates_since
         if Action.objects.filter(**unique_kwargs).exists():
